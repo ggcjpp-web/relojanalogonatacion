@@ -11,7 +11,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <link rel="icon" href="./icon-192.png">
-<title>Reloj de entrenamiento de natación · V5</title>
+<title>Reloj de entrenamiento de natación · V6</title>
 <style>
   :root { color-scheme: light; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
   * { box-sizing: border-box; }
@@ -244,7 +244,7 @@
 
           <details class="hand-detail" id="minuteHandDetail">
             <summary>Ajustar aguja de minutos</summary>
-            <div class="color-row"><label for="minuteColor">Color</label><input id="minuteColor" type="color" value="#a273f2"></div>
+            <div class="color-row"><label for="minuteColor">Color</label><input id="minuteColor" type="color" value="#9182ab"></div>
             <div class="slider-setting"><label for="minuteLength">Largo</label><input type="range" id="minuteLength" min="40" max="160" step="1" value="100"><output for="minuteLength" id="minuteLengthValue">100%</output></div>
             <div class="slider-setting"><label for="minuteWidth">Grosor</label><input type="range" id="minuteWidth" min="35" max="250" step="5" value="100"><output for="minuteWidth" id="minuteWidthValue">100%</output></div>
             <div class="slider-setting"><label for="minuteTipSize">Tamaño de punta</label><input type="range" id="minuteTipSize" min="50" max="200" step="5" value="100"><output for="minuteTipSize" id="minuteTipSizeValue">100%</output></div>
@@ -323,14 +323,15 @@
     neon:['#ff3276','#ffdf42','#08e0a5','#4cb0ff']
   };
   const defaults = {
-    mode:'four', shape:'square', theme:'white', numbers:true, marks:'five',
-    palette:'classic', colors:[...palettes.classic], training:false, interval:15,
+    mode:'four', shape:'minimal', theme:'white', numbers:true, marks:'five',
+    palette:'classic', colors:[...palettes.classic], training:true, interval:15,
     flash:true, sound:false, bigRemaining:false,
-    showHourHand:false, showMinuteHand:false, showDigitalTime:false,
-    hourColor:'#ff8c3a',minuteColor:'#a273f2',timeColor:'#b4ebff',
-    handLength:100, handWidth:100, tipSize:100, shaft:'straight', tip:'sharp',
+    showHourHand:false, showMinuteHand:true, showDigitalTime:false,
+    hourColor:'#ff8c3a',minuteColor:'#9182ab',timeColor:'#b4ebff',
+    handLength:125, handWidth:250, tipSize:120, shaft:'spindle', tip:'spear',
     hourLength:100,hourWidth:100,hourTipSize:100,hourShaft:'straight',hourTip:'sharp',
-    minuteLength:100,minuteWidth:100,minuteTipSize:100,minuteShaft:'straight',minuteTip:'sharp'
+    minuteLength:160,minuteWidth:50,minuteTipSize:100,minuteShaft:'straight',minuteTip:'sharp',
+    appearancePresetVersion:6
   };
   let stored = {};
   try { stored = JSON.parse(localStorage.getItem('swimPaceClock2026') || '{}') || {}; } catch (_) {}
@@ -345,7 +346,18 @@
       if(!Object.prototype.hasOwnProperty.call(stored,key) && Object.prototype.hasOwnProperty.call(stored,oldKey)) migration[key]=stored[oldKey];
     }
   }
-  const state = {...defaults, ...stored, ...migration};
+  // Aplicar el nuevo aspecto una sola vez, también al actualizar desde V5.
+  // Después, conservar las personalizaciones del usuario normalmente.
+  const appearanceUpdate = {};
+  if(stored.appearancePresetVersion !== 6) {
+    for(const key of ['mode','shape','theme','numbers','marks','palette','colors',
+      'training','interval','showHourHand','showMinuteHand','showDigitalTime',
+      'handLength','handWidth','tipSize','shaft','tip','minuteColor','minuteLength',
+      'minuteWidth','minuteTipSize','minuteShaft','minuteTip','appearancePresetVersion']) {
+      appearanceUpdate[key]=defaults[key];
+    }
+  }
+  const state = {...defaults, ...stored, ...migration, ...appearanceUpdate};
   if (!['four','two','one','ring','countdown'].includes(state.mode)) state.mode = 'four';
   if (!['square','circle','minimal'].includes(state.shape)) state.shape = 'square';
   if (!['white','sea','dark'].includes(state.theme)) state.theme = 'white';
