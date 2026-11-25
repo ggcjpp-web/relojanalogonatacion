@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eef2f5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Reloj natación">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" href="./icon-192.png">
+<title>Reloj de entrenamiento de natación · V5</title>
+<style>
+  :root { color-scheme: light; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  * { box-sizing: border-box; }
+  html,body { width:100%; height:100%; margin:0; overflow:hidden; }
+  body { background:#eef2f5; transition:background .25s; -webkit-user-select:none; user-select:none; }
+  body.theme-white { background:#eef2f5; }
+  body.theme-sea { background:radial-gradient(circle at 50% 40%,#d4f9ff 0%,#84d7ef 100%); }
+  body.theme-dark { background:radial-gradient(circle at 50% 44%,#1c3c58 0%,#081526 86%); }
+  #clockCanvas { position:fixed; inset:0; width:100%; height:100%; height:100dvh; display:block; touch-action:manipulation; }
+  .start-fullscreen { position:fixed; z-index:11; bottom:max(12px,env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 24px); display:flex; align-items:center; justify-content:center; gap:9px; padding:12px 17px; border:1px solid #c4d6e3; border-radius:14px; background:#ffffffed; color:#183346; box-shadow:0 4px 22px #08243926; font:700 14px system-ui,sans-serif; cursor:pointer; }
+  .start-fullscreen[hidden], .fullscreen-help[hidden] {display:none!important;}
+  .start-fullscreen svg { width:19px;height:19px;flex:none; }
+  .fullscreen-help { position:fixed; z-index:20; left:50%; top:50%; transform:translate(-50%,-50%); width:min(380px,calc(100% - 28px)); padding:20px; border-radius:18px; background:#fff; color:#183346; box-shadow:0 0 0 100vmax #06152580,0 12px 40px #0003; font:14px/1.5 system-ui,sans-serif; }
+  .fullscreen-help strong {font-size:17px;}
+  .fullscreen-help button {width:100%; margin-top:10px;}
+  .mini-gear {
+    position:fixed; right:max(11px,env(safe-area-inset-right)); top:max(11px,env(safe-area-inset-top)); z-index:10;
+    display:grid; place-items:center; height:34px; width:34px; padding:7px;
+    border:1px solid rgba(105,122,141,.19); border-radius:50%;
+    color:#607487; background:rgba(255,255,255,.64); opacity:.46;
+    cursor:pointer; backdrop-filter:blur(8px); transition:opacity .17s,transform .17s;
+  }
+  .mini-gear:hover,.mini-gear:focus-visible { opacity:1; transform:rotate(25deg); outline-offset:3px; }
+  .mini-gear svg { width:17px; height:17px; }
+  body.theme-dark .mini-gear { color:#e3edf8; border-color:#ffffff2b; background:#152e47aa; }
+  .veil { position:fixed; inset:0; z-index:15; background:#0615257b; backdrop-filter:blur(3px); }
+  .veil[hidden], .panel[hidden] { display:none !important; }
+  .panel {
+    position:fixed; z-index:16; top:12px; right:12px; bottom:12px;
+    width:min(392px,calc(100vw - 24px)); overflow-y:auto; overscroll-behavior:contain;
+    border-radius:22px; background:#fff; color:#183346; padding:20px 20px 18px;
+    box-shadow:0 22px 80px #03152655; scrollbar-width:thin;
+    -webkit-user-select:text; user-select:text;
+  }
+  .panel-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:17px; gap:10px; }
+  .panel h1 { font-size:19px; letter-spacing:-.03em; line-height:1.2; margin:0; font-weight:750; }
+  .close { width:32px; height:32px; display:grid; place-items:center; border:0; border-radius:10px; background:#f2f6f9; font-size:23px; color:#425769; cursor:pointer; }
+  .section { border-top:1px solid #e8eef2; padding:16px 0 4px; }
+  .section h2 { margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:.10em; color:#668196; font-weight:800; }
+  .choice-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .choice {
+    min-height:43px; border:1px solid #e2ebf0; background:#f7fafc; border-radius:11px;
+    font:600 13px/1.2 system-ui, sans-serif; color:#334d61; cursor:pointer; padding:8px 7px;
+  }
+  .choice:hover { border-color:#a5cae3; }
+  .choice.active { border:2px solid #1689dc; color:#0c6baa; background:#eaf7ff; padding:7px 6px; }
+  .choice .shape { display:inline-block; width:13px; height:13px; vertical-align:-2px; margin-right:3px; background:#fff; border:2px solid currentColor; border-radius:4px; }
+  .choice .shape.round { border-radius:50%; }
+  .row-setting { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:41px; font-size:13px; color:#243e52; }
+  .row-setting label { cursor:pointer; }
+  select { max-width:185px; min-height:34px; border:1px solid #d8e4eb; background:#f8fbfd; border-radius:9px; color:#20394e; padding:5px 10px; font:inherit; font-size:13px; }
+  input[type="checkbox"] { appearance:none; -webkit-appearance:none; width:39px; height:22px; flex:none; margin:0; border-radius:99px; background:#c8d6e0; cursor:pointer; position:relative; transition:background .18s; }
+  input[type="checkbox"]::after { content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; border-radius:50%; background:white; box-shadow:0 1px 3px #16344930; transition:transform .18s; }
+  input[type="checkbox"]:checked { background:#0d94d9; }
+  input[type="checkbox"]:checked::after { transform:translateX(17px); }
+  .palette-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .palette {
+    min-height:47px; padding:5px; border-radius:10px; border:1px solid #e0e9ed; background:#f9fbfc;
+    color:#355368; display:flex; flex-direction:column; align-items:center; gap:4px; font:600 10px system-ui, sans-serif; cursor:pointer;
+  }
+  .palette.active { border:2px solid #148bda; padding:4px; background:#eaf7ff; }
+  .swatches { display:flex; gap:3px; }
+  .swatches i { display:block; width:12px; height:12px; border-radius:50%; box-shadow:0 0 0 1px #0000000c; }
+  .custom-colors { margin-top:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .custom-colors span { font-size:12px; color:#617c8e; }
+  .color-wrap { display:flex; gap:7px; }
+  .color-wrap input { width:32px; height:31px; cursor:pointer; border:1px solid #d6e4eb; padding:3px; background:white; border-radius:8px; }
+  .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:13px; }
+  .action { font:700 13px system-ui, sans-serif; border-radius:11px; min-height:40px; border:1px solid #d8e5ed; background:#f6f9fb; color:#234055; cursor:pointer; }
+  .action.primary { background:#087fc0; border-color:#087fc0; color:white; }
+  .action.wide { grid-column:span 2; }
+  .advanced { border-top:1px solid #e8eef2; margin-top:14px; }
+  .advanced summary { padding:17px 3px; color:#314d62; font:700 13px system-ui,sans-serif; cursor:pointer; }
+  .advanced summary::marker { color:#849dac; }
+  .advanced[open] summary { padding-bottom:3px; }
+  .advanced-body .section:first-child { border-top:0; }
+  .advanced-body .section { padding-top:13px; }
+
+  .slider-setting { display:grid; grid-template-columns:minmax(0,1fr) 112px 40px; align-items:center; column-gap:9px; padding:8px 0; font-size:13px; color:#243e52; }
+  .slider-setting label { cursor:pointer; }
+  .slider-setting output { color:#137cb7; font-weight:750; font-size:12px; text-align:right; font-variant-numeric:tabular-nums; }
+  input[type="range"] { width:100%; cursor:pointer; accent-color:#1689dc; }
+  .style-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-top:8px; }
+  .style-button { min-height:59px; border:1px solid #e1eaf0; border-radius:10px; background:#f7fafc; padding:8px 6px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:4px; color:#3d566a; font:600 12px system-ui,sans-serif; cursor:pointer; }
+  .style-button.active { border:2px solid #1689dc; background:#eaf7ff; padding:7px 5px; color:#0b6caa; }
+  .style-button:hover { border-color:#7bbde6; }
+  .style-button svg { display:block; width:68px; height:25px; overflow:visible; }
+  .small-note { margin:2px 0 6px; color:#7990a1; font-size:11px; line-height:1.45; }
+  .color-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:5px 0; color:#243e52; font-size:13px; }
+  .color-row input[type="color"] { width:42px; height:32px; padding:3px; background:white; border:1px solid #d7e4ec; border-radius:9px; cursor:pointer; }
+  .minor-section { margin:12px 0 0; font-size:12px; font-weight:750; color:#476478; }
+  .inline-note { font-size:11px; color:#7b91a1; margin:6px 0 8px; line-height:1.5; }
+  .subtle-divider { height:1px; background:#e8eef2; margin:12px 0; }
+  .hand-detail { border:1px solid #e0eaf0; border-radius:12px; background:#f9fbfd; margin:9px 0; padding:0 11px; }
+  .hand-detail summary { padding:12px 1px; cursor:pointer; font-size:13px; font-weight:700; color:#314d62; }
+  .hand-detail[open] { padding-bottom:12px; }
+  .hand-detail .slider-setting { grid-template-columns:minmax(0,1fr) 106px 41px; }
+  .hand-detail .row-setting { padding:2px 0; }
+  .hand-detail .color-row { padding:7px 0; }
+  .hand-detail .row-setting label { font-size:12px; }
+  .hint { margin:13px 0 0; font-size:11px; color:#8299aa; text-align:center; }
+  @media (max-height:500px) { .panel { top:5px;right:5px;bottom:5px; padding:14px 16px; } }
+  @media (prefers-reduced-motion:reduce) { .mini-gear,body { transition:none; } }
+</style>
+</head>
+<body class="theme-white">
+  <canvas id="clockCanvas" role="img" aria-label="Reloj analógico de entrenamiento de natación"></canvas>
+  <button class="mini-gear" id="gear" aria-label="Abrir configuración" title="Configurar reloj">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/>
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.07.07-2.85 2.85-.07-.07A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.56V21H10v-.04A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.07.07-2.85-2.85.07-.07A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3.04 14H3v-4h.04A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.07-.07 2.85-2.85.07.07A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.04V3h4v.04A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.07-.07 2.85 2.85-.07.07A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1H21v4h-.04A1.7 1.7 0 0 0 19.4 15Z"/>
+    </svg>
+  </button>
+
+  <button type="button" class="start-fullscreen" id="startFullscreen" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>
+    Iniciar en pantalla completa
+  </button>
+  <div class="fullscreen-help" id="fullscreenHelp" role="dialog" aria-modal="true" aria-labelledby="fullscreenHelpTitle" hidden>
+    <strong id="fullscreenHelpTitle">Pantalla completa</strong>
+    <p id="fullscreenHelpText"></p>
+    <button type="button" class="action primary" id="fullscreenHelpClose">Continuar con el reloj</button>
+  </div>
+  <div class="veil" id="veil" hidden></div>
+  <aside class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="panelTitle" hidden>
+    <div class="panel-header">
+      <h1 id="panelTitle">Reloj de entrenamiento</h1>
+      <button class="close" id="close" aria-label="Cerrar configuración">×</button>
+    </div>
+
+    <section class="section">
+      <h2>Tipo de reloj</h2>
+      <div class="choice-grid" id="modeGrid">
+        <button type="button" class="choice" data-mode="four">4 agujas</button>
+        <button type="button" class="choice" data-mode="two">2 agujas</button>
+        <button type="button" class="choice" data-mode="one">1 aguja</button>
+        <button type="button" class="choice" data-mode="ring">Anillo de tiempo</button>
+        <button type="button" class="choice" data-mode="countdown" style="grid-column:span 2">Cuenta regresiva</button>
+      </div>
+    </section>
+
+
+
+
+
+    <section class="section">
+      <h2>Entrenamiento</h2>
+      <div class="row-setting"><label for="training">Activar avisos de salida</label><input type="checkbox" id="training"></div>
+      <div class="row-setting"><label for="interval">Intervalo de salida</label>
+        <select id="interval">
+          <option value="10">10 segundos</option><option value="15">15 segundos</option>
+          <option value="20">20 segundos</option><option value="30">30 segundos</option>
+          <option value="45">45 segundos</option><option value="60">60 segundos</option>
+        </select>
+      </div>
+      <div class="row-setting"><label for="flash">Destello en cada salida</label><input type="checkbox" id="flash"></div>
+      <div class="row-setting"><label for="sound">Pitido en cada salida</label><input type="checkbox" id="sound"></div>
+      <div class="row-setting"><label for="bigRemaining">Segundos grandes en cuenta regresiva</label><input type="checkbox" id="bigRemaining"></div>
+    </section>
+
+
+    <details class="advanced" id="needleAdvanced">
+      <summary>4 segunderos · forma y tamaño</summary>
+      <div class="advanced-body">
+        <section class="section">
+          <h2>Dimensiones de los segunderos</h2>
+          <div class="slider-setting">
+            <label for="handLength">Largo de las agujas</label>
+            <input type="range" id="handLength" min="55" max="125" step="1" value="100">
+            <output for="handLength" id="handLengthValue">100%</output>
+          </div>
+          <div class="slider-setting">
+            <label for="handWidth">Grosor de las agujas</label>
+            <input type="range" id="handWidth" min="40" max="250" step="5" value="100">
+            <output for="handWidth" id="handWidthValue">100%</output>
+          </div>
+          <div class="slider-setting">
+            <label for="tipSize">Tamaño de la punta</label>
+            <input type="range" id="tipSize" min="50" max="200" step="5" value="100">
+            <output for="tipSize" id="tipSizeValue">100%</output>
+          </div>
+          <p class="small-note">Estos ajustes solo modifican los segunderos del entrenamiento; las agujas de hora y minuto se configuran por separado.</p>
+          <div class="subtle-divider"></div>
+          <h2>Forma del cuerpo</h2>
+          <div class="style-grid" id="shaftGrid">
+            <button type="button" class="style-button" data-shaft="straight"><svg viewBox="0 0 80 25" aria-hidden="true"><rect x="8" y="9" width="64" height="7" rx="2" fill="currentColor"/></svg>Recta</button>
+            <button type="button" class="style-button" data-shaft="taper"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M8 7 L72 11 L72 14 L8 18 Z" fill="currentColor"/></svg>Cónica</button>
+            <button type="button" class="style-button" data-shaft="sword"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M7 10 L21 6 L42 8 L72 11 L72 14 L42 17 L21 19 L7 15 Z" fill="currentColor"/></svg>Espada</button>
+            <button type="button" class="style-button" data-shaft="spindle"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M7 11 L22 9 L45 5 L73 12.5 L45 20 L22 16 L7 14 Z" fill="currentColor"/></svg>Huso</button>
+            <button type="button" class="style-button" data-shaft="split"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M8 9 H72 V11.5 H8 Z M8 14 H72 V16.5 H8 Z" fill="currentColor"/></svg>Doble línea</button>
+            <button type="button" class="style-button" data-shaft="tube"><svg viewBox="0 0 80 25" aria-hidden="true"><rect x="8" y="7" width="64" height="11" rx="5.5" fill="currentColor"/><path d="M14 12.5 H67" stroke="#fff" stroke-width="2" opacity=".8"/></svg>Tubo</button>
+          </div>
+          <div class="subtle-divider"></div>
+          <h2>Forma de la punta</h2>
+          <div class="style-grid" id="tipGrid">
+            <button type="button" class="style-button" data-tip="sharp"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M7 10 H58 L74 12.5 L58 15 H7 Z" fill="currentColor"/></svg>Fina</button>
+            <button type="button" class="style-button" data-tip="arrow"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M7 10 H52 V5 L75 12.5 L52 20 V15 H7 Z" fill="currentColor"/></svg>Flecha</button>
+            <button type="button" class="style-button" data-tip="round"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M7 9 H65 A4 4 0 0 1 65 17 H7 Z" fill="currentColor"/></svg>Redonda</button>
+            <button type="button" class="style-button" data-tip="flat"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M7 9 H70 V16 H7 Z" fill="currentColor"/></svg>Plana</button>
+            <button type="button" class="style-button" data-tip="diamond"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M7 10 H54 L65 5 L76 12.5 L65 20 L54 15 H7 Z" fill="currentColor"/></svg>Rombo</button>
+            <button type="button" class="style-button" data-tip="spear"><svg viewBox="0 0 80 25" aria-hidden="true"><path d="M7 10 H42 L52 7 L76 12.5 L52 18 L42 15 H7 Z" fill="currentColor"/></svg>Lanza</button>
+          </div>
+        </section>
+      </div>
+    </details>
+
+    <details class="advanced" id="realTimeAdvanced">
+      <summary>Hora actual · agujas independientes</summary>
+      <div class="advanced-body">
+        <section class="section">
+          <h2>Visibilidad</h2>
+          <div class="row-setting"><label for="showHourHand">Mostrar aguja de horas</label><input type="checkbox" id="showHourHand"></div>
+          <div class="row-setting"><label for="showMinuteHand">Mostrar aguja de minutos</label><input type="checkbox" id="showMinuteHand"></div>
+          <div class="row-setting"><label for="showDigitalTime">Mostrar hora digital</label><input type="checkbox" id="showDigitalTime"></div>
+          <p class="inline-note">Las agujas muestran la hora real del dispositivo y continúan avanzando aunque pauses el entrenamiento.</p>
+
+          <details class="hand-detail" id="hourHandDetail">
+            <summary>Ajustar aguja de horas</summary>
+            <div class="color-row"><label for="hourColor">Color</label><input id="hourColor" type="color" value="#ff8c3a"></div>
+            <div class="slider-setting"><label for="hourLength">Largo</label><input type="range" id="hourLength" min="40" max="160" step="1" value="100"><output for="hourLength" id="hourLengthValue">100%</output></div>
+            <div class="slider-setting"><label for="hourWidth">Grosor</label><input type="range" id="hourWidth" min="35" max="250" step="5" value="100"><output for="hourWidth" id="hourWidthValue">100%</output></div>
+            <div class="slider-setting"><label for="hourTipSize">Tamaño de punta</label><input type="range" id="hourTipSize" min="50" max="200" step="5" value="100"><output for="hourTipSize" id="hourTipSizeValue">100%</output></div>
+            <div class="row-setting"><label for="hourShaft">Forma del cuerpo</label>
+              <select id="hourShaft"><option value="straight">Recta</option><option value="taper">Cónica</option><option value="sword">Espada</option><option value="spindle">Huso</option><option value="split">Doble línea</option><option value="tube">Tubo</option></select>
+            </div>
+            <div class="row-setting"><label for="hourTip">Forma de la punta</label>
+              <select id="hourTip"><option value="sharp">Fina</option><option value="arrow">Flecha</option><option value="round">Redonda</option><option value="flat">Plana</option><option value="diamond">Rombo</option><option value="spear">Lanza</option></select>
+            </div>
+          </details>
+
+          <details class="hand-detail" id="minuteHandDetail">
+            <summary>Ajustar aguja de minutos</summary>
+            <div class="color-row"><label for="minuteColor">Color</label><input id="minuteColor" type="color" value="#a273f2"></div>
+            <div class="slider-setting"><label for="minuteLength">Largo</label><input type="range" id="minuteLength" min="40" max="160" step="1" value="100"><output for="minuteLength" id="minuteLengthValue">100%</output></div>
+            <div class="slider-setting"><label for="minuteWidth">Grosor</label><input type="range" id="minuteWidth" min="35" max="250" step="5" value="100"><output for="minuteWidth" id="minuteWidthValue">100%</output></div>
+            <div class="slider-setting"><label for="minuteTipSize">Tamaño de punta</label><input type="range" id="minuteTipSize" min="50" max="200" step="5" value="100"><output for="minuteTipSize" id="minuteTipSizeValue">100%</output></div>
+            <div class="row-setting"><label for="minuteShaft">Forma del cuerpo</label>
+              <select id="minuteShaft"><option value="straight">Recta</option><option value="taper">Cónica</option><option value="sword">Espada</option><option value="spindle">Huso</option><option value="split">Doble línea</option><option value="tube">Tubo</option></select>
+            </div>
+            <div class="row-setting"><label for="minuteTip">Forma de la punta</label>
+              <select id="minuteTip"><option value="sharp">Fina</option><option value="arrow">Flecha</option><option value="round">Redonda</option><option value="flat">Plana</option><option value="diamond">Rombo</option><option value="spear">Lanza</option></select>
+            </div>
+          </details>
+          <div class="color-row"><label for="timeColor">Color de la hora digital</label><input id="timeColor" type="color" value="#b4ebff"></div>
+        </section>
+      </div>
+    </details>
+
+    <details class="advanced" id="advanced">
+      <summary>Apariencia y colores</summary>
+      <div class="advanced-body">
+    <section class="section">
+      <h2>Aspecto</h2>
+      <div class="choice-grid" id="shapeGrid">
+        <button type="button" class="choice" data-shape="square"><i class="shape"></i>Cuadrado</button>
+        <button type="button" class="choice" data-shape="circle"><i class="shape round"></i>Redondo</button>
+        <button type="button" class="choice" data-shape="minimal">Sin marco</button>
+      </div>
+      <div class="row-setting"><label for="theme">Fondo</label>
+        <select id="theme"><option value="white">Claro</option><option value="sea">Azul piscina</option><option value="dark">Oscuro</option></select>
+      </div>
+      <div class="row-setting"><label for="numbers">Mostrar números 0–50</label><input type="checkbox" id="numbers"></div>
+      <div class="row-setting"><label for="marks">Marcas de segundos</label>
+        <select id="marks"><option value="ten">Cada 10 segundos</option><option value="five">Cada 5 segundos</option><option value="one">Cada segundo</option></select>
+      </div>
+    </section>
+    <section class="section">
+      <h2>Colores de las agujas</h2>
+      <div class="palette-grid" id="paletteGrid">
+        <button type="button" class="palette" data-palette="classic"><span class="swatches"><i style="background:#e92343"></i><i style="background:#f5ca16"></i><i style="background:#16a15d"></i><i style="background:#3756ed"></i></span>Clásicos</button>
+        <button type="button" class="palette" data-palette="bright"><span class="swatches"><i style="background:#ff4a4a"></i><i style="background:#ffab00"></i><i style="background:#16ccbd"></i><i style="background:#9d4df3"></i></span>Vivos</button>
+        <button type="button" class="palette" data-palette="pastel"><span class="swatches"><i style="background:#e7869a"></i><i style="background:#e4b35b"></i><i style="background:#69bfa0"></i><i style="background:#729acb"></i></span>Suaves</button>
+        <button type="button" class="palette" data-palette="neon"><span class="swatches"><i style="background:#ff3276"></i><i style="background:#ffdf42"></i><i style="background:#08e0a5"></i><i style="background:#4cb0ff"></i></span>Neón</button>
+      </div>
+      <div class="custom-colors"><span>Personalizar</span><div class="color-wrap">
+        <input aria-label="Aguja 1" title="Aguja 1" type="color" data-color="0">
+        <input aria-label="Aguja 2" title="Aguja 2" type="color" data-color="1">
+        <input aria-label="Aguja 3" title="Aguja 3" type="color" data-color="2">
+        <input aria-label="Aguja 4" title="Aguja 4" type="color" data-color="3">
+      </div></div>
+    </section>
+      </div>
+    </details>
+
+    <section class="section">
+      <h2>Controles</h2>
+      <div class="actions">
+        <button type="button" class="action primary" id="play">Pausar</button>
+        <button type="button" class="action" id="restart">Reiniciar</button>
+        <button type="button" class="action wide" id="fullscreen">Pantalla completa</button>
+      </div>
+      <p class="hint">Atajos: Espacio = pausar · R = reiniciar · F = pantalla completa</p>
+    </section>
+  </aside>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const canvas = $('clockCanvas');
+  const ctx = canvas.getContext('2d', {alpha:true});
+  if(typeof ctx.roundRect!=='function') ctx.roundRect=function(x,y,w,h,r){
+    r=Math.max(0,Math.min(r,w/2,h/2));
+    this.moveTo(x+r,y);this.arcTo(x+w,y,x+w,y+h,r);this.arcTo(x+w,y+h,x,y+h,r);this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);this.closePath();
+  };
+  const palettes = {
+    classic:['#e92343','#f5ca16','#16a15d','#3756ed'],
+    bright:['#ff4a4a','#ffab00','#16ccbd','#9d4df3'],
+    pastel:['#e7869a','#e4b35b','#69bfa0','#729acb'],
+    neon:['#ff3276','#ffdf42','#08e0a5','#4cb0ff']
+  };
+  const defaults = {
+    mode:'four', shape:'square', theme:'white', numbers:true, marks:'five',
+    palette:'classic', colors:[...palettes.classic], training:false, interval:15,
+    flash:true, sound:false, bigRemaining:false,
+    showHourHand:false, showMinuteHand:false, showDigitalTime:false,
+    hourColor:'#ff8c3a',minuteColor:'#a273f2',timeColor:'#b4ebff',
+    handLength:100, handWidth:100, tipSize:100, shaft:'straight', tip:'sharp',
+    hourLength:100,hourWidth:100,hourTipSize:100,hourShaft:'straight',hourTip:'sharp',
+    minuteLength:100,minuteWidth:100,minuteTipSize:100,minuteShaft:'straight',minuteTip:'sharp'
+  };
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem('swimPaceClock2026') || '{}') || {}; } catch (_) {}
+  // Migración sin perder los ajustes previos: antes las agujas de reloj
+  // compartían visibilidad, tamaño y forma con los segunderos.
+  const migration = {};
+  if (!Object.prototype.hasOwnProperty.call(stored,'showHourHand')) migration.showHourHand=stored.showClockHands===true;
+  if (!Object.prototype.hasOwnProperty.call(stored,'showMinuteHand')) migration.showMinuteHand=stored.showClockHands===true;
+  for(const prefix of ['hour','minute']) {
+    for(const [suffix,oldKey] of [['Length','handLength'],['Width','handWidth'],['TipSize','tipSize'],['Shaft','shaft'],['Tip','tip']]) {
+      const key=prefix+suffix;
+      if(!Object.prototype.hasOwnProperty.call(stored,key) && Object.prototype.hasOwnProperty.call(stored,oldKey)) migration[key]=stored[oldKey];
+    }
+  }
+  const state = {...defaults, ...stored, ...migration};
+  if (!['four','two','one','ring','countdown'].includes(state.mode)) state.mode = 'four';
+  if (!['square','circle','minimal'].includes(state.shape)) state.shape = 'square';
+  if (!['white','sea','dark'].includes(state.theme)) state.theme = 'white';
+  if (!['ten','five','one'].includes(state.marks)) state.marks = 'five';
+  if (![10,15,20,30,45,60].includes(Number(state.interval))) state.interval = 15;
+  state.interval = Number(state.interval);
+  const shaftOptions=['straight','taper','sword','spindle','split','tube'];
+  const tipOptions=['sharp','arrow','round','flat','diamond','spear'];
+  for(const k of ['shaft','hourShaft','minuteShaft']) if(!shaftOptions.includes(state[k])) state[k]=defaults[k];
+  for(const k of ['tip','hourTip','minuteTip']) if(!tipOptions.includes(state[k])) state[k]=defaults[k];
+  for (const [k,lo,hi] of [
+    ['handLength',55,125],['handWidth',40,250],['tipSize',50,200],
+    ['hourLength',40,160],['hourWidth',35,250],['hourTipSize',50,200],
+    ['minuteLength',40,160],['minuteWidth',35,250],['minuteTipSize',50,200]
+  ]) {
+    const n=Number(state[k]); state[k]=Number.isFinite(n)?Math.max(lo,Math.min(hi,n)):defaults[k];
+  }
+  for(const k of ['hourColor','minuteColor','timeColor']) {
+    if(typeof state[k]!=='string'||!/^#[0-9a-fA-F]{6}$/.test(state[k])) state[k]=defaults[k];
+  }
+  state.showHourHand=state.showHourHand===true;
+  state.showMinuteHand=state.showMinuteHand===true;
+  state.showDigitalTime=state.showDigitalTime===true;
+  if (!Array.isArray(state.colors) || state.colors.length !== 4 || !state.colors.every(c=>/^#[0-9a-fA-F]{6}$/.test(c))) state.colors=[...palettes.classic];
+  let elapsedMs = 0;
+  let running = true;
+  let lastFrame = performance.now();
+  let pulseAt = -5000;
+  let lastCueIndex = 0;
+  let audioCtx = null;
+  let cssWidth = 0, cssHeight = 0;
+  const TAU = Math.PI * 2;
+  const isDark = () => state.theme==='dark';
+  const textInk = () => isDark() ? '#edf8ff' : '#142935';
+
+  function persist() {
+    try { localStorage.setItem('swimPaceClock2026', JSON.stringify(state)); } catch (_) {}
+  }
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Medir el área real del canvas, incluso con barras móviles o pantalla completa.
+    const {width:w,height:h} = canvas.getBoundingClientRect();
+    if (w<=0 || h<=0) return;
+    const bw=Math.max(1,Math.round(w*dpr)), bh=Math.max(1,Math.round(h*dpr));
+    if(cssWidth===w && cssHeight===h && canvas.width===bw && canvas.height===bh) return;
+    cssWidth=w; cssHeight=h;
+    canvas.width=bw; canvas.height=bh;
+    ctx.setTransform(bw/w,0,0,bh/h,0,0);
+  }
+  window.addEventListener('resize', resize, {passive:true});
+  window.addEventListener('orientationchange', resize, {passive:true});
+  window.visualViewport?.addEventListener('resize', resize, {passive:true});
+  if(typeof ResizeObserver!=='undefined') new ResizeObserver(resize).observe(canvas);
+
+  function roundRect(x,y,w,h,r) {
+    ctx.beginPath();ctx.roundRect(x,y,w,h,r);
+  }
+  function drawBase() {
+    if (state.shape==='minimal') return;
+    ctx.save();
+    ctx.shadowColor=isDark()?'#0009':'#0e47602b'; ctx.shadowBlur=36; ctx.shadowOffsetY=16;
+    if(state.shape==='square') roundRect(-475,-475,950,950,87);
+    else { ctx.beginPath();ctx.arc(0,0,473,0,TAU); }
+    ctx.fillStyle=isDark()?'#10283d':'#ffffff';ctx.fill();
+    ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+    ctx.strokeStyle=isDark()?'#57738955':'#bdcfdc77';ctx.lineWidth=3;ctx.stroke();
+    if(state.shape==='circle') {
+      ctx.beginPath();ctx.arc(0,0,453,0,TAU);
+      ctx.strokeStyle=isDark()?'#ffffff15':'#9bb1c520';ctx.lineWidth=2;ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawFace() {
+    const dark=isDark();
+    const ink=textInk();
+    const count= state.marks==='one'?60:state.marks==='ten'?6:12;
+    ctx.save();
+    ctx.lineCap='round';
+    for(let i=0;i<count;i++) {
+      const sec=i*60/count, rad=sec*TAU/60;
+      const isTen=Math.round(sec)%10===0;
+      const x1=Math.sin(rad)*(isTen?413:425), y1=-Math.cos(rad)*(isTen?413:425);
+      const x2=Math.sin(rad)*448, y2=-Math.cos(rad)*448;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+      ctx.strokeStyle=dark?'#d6e8f0':'#26333d';
+      ctx.globalAlpha=isTen ? 0.80 : 0.45;
+      ctx.lineWidth=isTen?5.6:3.7;ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+    if(state.numbers) {
+      ctx.fillStyle=ink;ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.font='600 49px "Arial Narrow", "Roboto Condensed", Arial, sans-serif';
+      for(let s=0;s<60;s+=10){
+        const a=s*TAU/60, r=349;
+        ctx.fillText(String(s), Math.sin(a)*r, -Math.cos(a)*r+2);
+      }
+    }
+    ctx.restore();
+  }
+  // Renderizador común, con dimensiones y diseños independientes por aguja.
+  function hand(angle,color,role='pace') {
+    const hour=role==='hour', minute=role==='minute';
+    const prefix=hour?'hour':minute?'minute':'';
+    const len=320*(state[prefix?prefix+'Length':'handLength']/100)*(hour?.64:minute?.86:1);
+    const w=15*(state[prefix?prefix+'Width':'handWidth']/100)*(hour?1.05:minute?.76:1);
+    const rear=w*(hour?.96:minute?1.18:1.8);
+    const tipScale=state[prefix?prefix+'TipSize':'tipSize']/100;
+    const shape=state[prefix?prefix+'Shaft':'shaft'];
+    const tip=state[prefix?prefix+'Tip':'tip'];
+    const tipLen= (tip==='flat'||tip==='round') ? 0 : Math.min(len*.26, (tip==='spear'?30:tip==='arrow'?20:tip==='diamond'?17:24)*tipScale*Math.sqrt(w/15));
+    const tipBase=-len+tipLen;
+    const a=Math.max(1,w/2);
+    ctx.save(); ctx.rotate(angle); ctx.fillStyle=color;ctx.strokeStyle=color;
+    ctx.shadowColor=color+'66';ctx.shadowBlur=role==='pace'?9:5;
+    ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.beginPath();
+    if(shape==='straight') {
+      if(tip==='flat') ctx.rect(-a,tipBase,w,rear-tipBase);
+      else ctx.roundRect(-a,tipBase,w,rear-tipBase,Math.min(a,5));ctx.fill();
+    } else if(shape==='taper') {
+      ctx.moveTo(-a*1.10,rear);ctx.lineTo(-Math.max(1,a*.29),tipBase);
+      ctx.lineTo(Math.max(1,a*.29),tipBase);ctx.lineTo(a*1.10,rear);ctx.closePath();ctx.fill();
+    } else if(shape==='sword') {
+      ctx.moveTo(-a*.57,rear);ctx.lineTo(-a*1.22,-len*.18);
+      ctx.lineTo(-a*.85,-len*.46);ctx.lineTo(-a*.32,tipBase);
+      ctx.lineTo(a*.32,tipBase);ctx.lineTo(a*.85,-len*.46);
+      ctx.lineTo(a*1.22,-len*.18);ctx.lineTo(a*.57,rear);ctx.closePath();ctx.fill();
+    } else if(shape==='spindle') {
+      ctx.moveTo(-a*.55,rear);ctx.lineTo(-a*.7,-len*.23);
+      ctx.lineTo(-a*1.32,-len*.57);ctx.lineTo(-a*.24,tipBase);
+      ctx.lineTo(a*.24,tipBase);ctx.lineTo(a*1.32,-len*.57);
+      ctx.lineTo(a*.7,-len*.23);ctx.lineTo(a*.55,rear);ctx.closePath();ctx.fill();
+    } else if(shape==='split') {
+      const rail=Math.max(1.65,w*.18),offset=w*.33;
+      ctx.lineWidth=rail;
+      for(const x of [-offset,offset]) {
+        ctx.beginPath();ctx.moveTo(x,rear);ctx.lineTo(x,tipBase);ctx.stroke();
+      }
+      ctx.lineWidth=Math.max(1.5,w*.24);
+      ctx.beginPath();ctx.moveTo(-offset,rear);ctx.lineTo(offset,rear);
+      ctx.moveTo(-offset,tipBase);ctx.lineTo(offset,tipBase);ctx.stroke();
+    } else if(shape==='tube') {
+      ctx.roundRect(-a*1.08,tipBase,w*1.08,rear-tipBase,Math.min(w*.55,9));ctx.fill();
+      ctx.save();ctx.shadowBlur=0;
+      ctx.strokeStyle='#ffffff';ctx.globalAlpha=isDark()?.42:.3;
+      ctx.lineWidth=Math.max(1,w*.17);
+      ctx.beginPath();ctx.moveTo(-a*.11,rear-w*.33);ctx.lineTo(-a*.11,tipBase+w*.5);ctx.stroke();
+      ctx.restore();
+    }
+    ctx.shadowBlur=0;
+    // Render de la punta, separado del cuerpo para poder mezclar diseños.
+    if(tip==='sharp') {
+      ctx.beginPath();ctx.moveTo(-a*.7,tipBase+1);ctx.lineTo(0,-len);
+      ctx.lineTo(a*.7,tipBase+1);ctx.closePath();ctx.fill();
+    } else if(tip==='arrow') {
+      const half=a*1.95;
+      ctx.beginPath();ctx.moveTo(-half,tipBase+tipLen*.30);
+      ctx.lineTo(-half,tipBase);ctx.lineTo(0,-len);
+      ctx.lineTo(half,tipBase);ctx.lineTo(half,tipBase+tipLen*.30);
+      ctx.lineTo(0,tipBase+tipLen*.05);ctx.closePath();ctx.fill();
+    } else if(tip==='flat') {
+      ctx.fillRect(-Math.max(1,a*.58),-len,Math.max(2,a*1.16),Math.max(2,w*.3));
+    } else if(tip==='round') {
+      ctx.beginPath();ctx.arc(0,-len+a*.2,a*.98,0,TAU);ctx.fill();
+    } else if(tip==='diamond') {
+      ctx.beginPath();ctx.moveTo(0,tipBase+tipLen*.22);
+      ctx.lineTo(-a*1.35,tipBase-tipLen*.48);ctx.lineTo(0,-len);
+      ctx.lineTo(a*1.35,tipBase-tipLen*.48);ctx.closePath();ctx.fill();
+    } else if(tip==='spear') {
+      ctx.beginPath();ctx.moveTo(0,tipBase+tipLen*.22);
+      ctx.lineTo(-a*.95,tipBase-tipLen*.12);ctx.lineTo(0,-len);
+      ctx.lineTo(a*.95,tipBase-tipLen*.12);ctx.closePath();ctx.fill();
+    }
+    // Realce discreto para conservar la lectura en proyectores.
+    if(shape!=='split' && shape!=='tube' && w>=7) {
+      ctx.save();ctx.shadowBlur=0;ctx.strokeStyle='#ffffff';ctx.globalAlpha=isDark()?.23:.19;
+      ctx.lineWidth=Math.max(1,w*.14);ctx.beginPath();
+      ctx.moveTo(-a*.21,rear*.45);ctx.lineTo(-a*.21,tipBase+Math.min(9,w));ctx.stroke();ctx.restore();
+    }
+    ctx.restore();
+  }
+  function drawRealTime(nowDate) {
+    if(!state.showHourHand && !state.showMinuteHand) return;
+    const sec=nowDate.getSeconds()+nowDate.getMilliseconds()/1000;
+    const min=nowDate.getMinutes()+sec/60;
+    const hour=nowDate.getHours()%12+min/60;
+    // Cada aguja puede activarse individualmente y no depende del cronómetro.
+    if(state.showHourHand) hand(hour*TAU/12,state.hourColor,'hour');
+    if(state.showMinuteHand) hand(min*TAU/60,state.minuteColor,'minute');
+  }
+  function drawDigitalTime(nowDate) {
+    if(!state.showDigitalTime) return;
+    const pad=n=>String(n).padStart(2,'0');
+    const value=pad(nowDate.getHours())+':'+pad(nowDate.getMinutes())+':'+pad(nowDate.getSeconds());
+    ctx.save();
+    ctx.font='700 43px ui-monospace, SFMono-Regular, Consolas, monospace';
+    const width=ctx.measureText(value).width+37;
+    ctx.fillStyle=isDark()?'#061829ee':'#123249f0';
+    ctx.beginPath();ctx.roundRect(-width/2,240,width,63,16);ctx.fill();
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=state.timeColor;
+    ctx.fillText(value,0,273);
+    ctx.restore();
+  }
+  function centerPin() {
+    ctx.save();
+    ctx.beginPath();ctx.arc(0,0,15,0,TAU);
+    ctx.fillStyle=isDark()?'#a7c0d0':'#d6e1e8';ctx.fill();
+    ctx.beginPath();ctx.arc(-3,-3,6.2,0,TAU);
+    ctx.fillStyle=isDark()?'#f5fbff':'#f8fcff';ctx.fill();
+    ctx.restore();
+  }
+  function markersForTraining() {
+    if(!(state.training || state.mode==='countdown')) return;
+    const n=state.interval;
+    ctx.save();
+    for(let sec=0;sec<60;sec+=(n===45?15:n)) {
+      const a=sec*TAU/60, r=388;
+      const x=Math.sin(a)*r,y=-Math.cos(a)*r;
+      ctx.beginPath();ctx.arc(x,y,5.6,0,TAU);
+      ctx.fillStyle=state.colors[2];ctx.globalAlpha=.8;ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawRing(sec) {
+    const dark=isDark();
+    ctx.save();
+    ctx.lineCap='round';ctx.lineWidth=30;
+    ctx.beginPath();ctx.arc(0,0,301,0,TAU);
+    ctx.strokeStyle=dark?'#3a5870':'#dbeaf2';ctx.stroke();
+    const extent=Math.max(.001,sec*TAU/60);
+    const parts=4;
+    for(let i=0;i<parts;i++) {
+      const a0=i*TAU/parts;
+      if (extent<=a0) break;
+      const a1=Math.min((i+1)*TAU/parts,extent);
+      ctx.beginPath();ctx.arc(0,0,301,-Math.PI/2+a0,-Math.PI/2+a1);
+      ctx.strokeStyle=state.colors[i];ctx.lineWidth=30;ctx.stroke();
+    }
+    const a=sec*TAU/60;
+    const x=Math.sin(a)*301, y=-Math.cos(a)*301;
+    ctx.beginPath();ctx.arc(x,y,21,0,TAU);
+    ctx.fillStyle=state.colors[Math.min(3,Math.floor(sec/15))];ctx.fill();
+    ctx.strokeStyle=dark?'#10283d':'white';ctx.lineWidth=5;ctx.stroke();
+    ctx.restore();
+  }
+  function drawCountdown(totalSec) {
+    const interval=state.interval;
+    const rem=interval-((totalSec % interval+interval)%interval);
+    const angle=(rem/60)*TAU;
+    ctx.save();
+    ctx.beginPath();ctx.arc(0,0,385,-Math.PI/2,-Math.PI/2+(interval/60)*TAU);
+    ctx.strokeStyle=isDark()?'#ffffff20':'#d6e3ec';ctx.lineWidth=16;ctx.stroke();
+    ctx.beginPath();ctx.arc(0,0,385,-Math.PI/2,-Math.PI/2+(rem/60)*TAU);
+    ctx.strokeStyle=rem<=5?state.colors[0]:state.colors[2];ctx.lineWidth=16;ctx.lineCap='round';ctx.stroke();
+    ctx.restore();
+    hand(angle,rem<=5?state.colors[0]:state.colors[3]);
+    if(state.bigRemaining) {
+      ctx.save();ctx.fillStyle=textInk();ctx.font='700 125px system-ui,sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(String(Math.ceil(rem)),0,175);
+      ctx.restore();
+    }
+  }
+  function drawPulse(now) {
+    if (!state.flash) return;
+    const age=now-pulseAt;
+    if(age<0||age>950) return;
+    const intensity=(1-age/950)**1.6;
+    ctx.save();
+    const color=state.colors[2];
+    ctx.globalAlpha=intensity*.9;ctx.shadowColor=color;ctx.shadowBlur=38+intensity*55;
+    ctx.beginPath();
+    // Mantener el destello dentro del reloj ampliado.
+    if(state.shape==='square') roundRect(-459,-459,918,918,84);
+    else ctx.arc(0,0,state.shape==='minimal'?435:457,0,TAU);
+    ctx.lineWidth=10+intensity*20;ctx.strokeStyle=color;ctx.stroke();
+    ctx.restore();
+  }
+  function draw(now) {
+    ctx.clearRect(0,0,cssWidth,cssHeight);
+    const available=Math.min(cssWidth,cssHeight);
+    // Escala uniforme: ocupar casi el 100% del lado menor sin cortar el marco.
+    const diameter=state.shape==='minimal'?904:953;
+    const margin=Math.min(4,available*.005);
+    const s=Math.max(0,available-2*margin)/diameter;
+    ctx.save();ctx.translate(cssWidth/2,cssHeight/2);ctx.scale(s,s);
+    drawBase();drawFace();
+    const realNow=new Date();
+    drawRealTime(realNow);
+    const sec=(elapsedMs/1000)%60;
+    const a=sec*TAU/60;
+    if(state.mode==='four') {
+      // Cuatro agujas separadas exactamente 15 segundos, como el reloj de referencia.
+      for(let i=0;i<4;i++) hand(a+i*Math.PI/2,state.colors[[0,1,3,2][i]]);
+      centerPin();
+    } else if(state.mode==='two') {
+      hand(a+Math.PI,state.colors[3]);hand(a,state.colors[0]);centerPin();
+    } else if(state.mode==='one') {
+      hand(a,state.colors[0]);centerPin();
+    } else if(state.mode==='ring') {
+      drawRing(sec);centerPin();
+    } else {
+      drawCountdown(elapsedMs/1000);centerPin();
+    }
+    markersForTraining();drawPulse(now);drawDigitalTime(realNow);
+    ctx.restore();
+  }
+  function unlockAudio() {
+    try {
+      if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      if(audioCtx.state==='suspended') audioCtx.resume();
+    }catch(_){audioCtx=null;}
+  }
+  function beep() {
+    if(!state.sound) return;
+    unlockAudio();if(!audioCtx) return;
+    try {
+      const t=audioCtx.currentTime;
+      const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+      osc.type='sine';osc.frequency.setValueAtTime(780,t);
+      osc.frequency.setValueAtTime(990,t+.105);
+      gain.gain.setValueAtTime(.0001,t);
+      gain.gain.exponentialRampToValueAtTime(.16,t+.012);
+      gain.gain.setValueAtTime(.16,t+.125);
+      gain.gain.exponentialRampToValueAtTime(.0001,t+.19);
+      osc.connect(gain);gain.connect(audioCtx.destination);
+      osc.start(t);osc.stop(t+.205);
+    }catch(_){}
+  }
+  function tick(now) {
+    const dt=Math.max(0,now-lastFrame); lastFrame=now;
+    if(running){
+      elapsedMs+=dt;
+      const cueIndex=Math.floor(elapsedMs/(state.interval*1000));
+      if(cueIndex>lastCueIndex && dt<1500 && (state.training||state.mode==='countdown')) {
+        pulseAt=now;beep();
+      }
+      lastCueIndex=cueIndex;
+    }
+    draw(now);requestAnimationFrame(tick);
+  }
+  const fullElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+  const appDisplay = () => navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches;
+  let dismissedFullscreen = false;
+  function refreshFullscreen() {
+    const full=!!fullElement(), app=appDisplay();
+    $('startFullscreen').hidden=full || app || dismissedFullscreen || !$('panel').hidden || !$('fullscreenHelp').hidden;
+    $('fullscreen').textContent=full?'Salir de pantalla completa':app?'Aplicación independiente':'Pantalla completa';
+    $('fullscreen').disabled=app&&!full;
+  }
+  function refresh() {
+    document.body.className='theme-'+state.theme;
+    $('theme').value=state.theme;$('marks').value=state.marks;
+    for(const id of ['numbers','training','flash','sound','bigRemaining','showHourHand','showMinuteHand','showDigitalTime']) $(id).checked=!!state[id];
+    $('interval').value=String(state.interval);
+    for(const k of ['handLength','handWidth','tipSize','hourLength','hourWidth','hourTipSize','minuteLength','minuteWidth','minuteTipSize']) {$(k).value=String(state[k]);$(k+'Value').textContent=state[k]+'%';}
+    for(const k of ['hourColor','minuteColor','timeColor','hourShaft','hourTip','minuteShaft','minuteTip']) $(k).value=state[k];
+    document.querySelectorAll('[data-shaft]').forEach(b=>b.classList.toggle('active',b.dataset.shaft===state.shaft));
+    document.querySelectorAll('[data-tip]').forEach(b=>b.classList.toggle('active',b.dataset.tip===state.tip));
+    document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));
+    document.querySelectorAll('[data-shape]').forEach(b=>b.classList.toggle('active',b.dataset.shape===state.shape));
+    document.querySelectorAll('[data-palette]').forEach(b=>b.classList.toggle('active',b.dataset.palette===state.palette));
+    document.querySelectorAll('[data-color]').forEach(b=>b.value=state.colors[Number(b.dataset.color)]);
+    $('play').textContent=running?'Pausar':'Continuar';
+    refreshFullscreen();
+    persist();
+  }
+  function openPanel() {
+    $('panel').hidden=false;$('veil').hidden=false;
+    $('gear').setAttribute('aria-expanded','true');$('close').focus();refreshFullscreen();
+  }
+  function closePanel() {
+    $('panel').hidden=true;$('veil').hidden=true;
+    $('gear').setAttribute('aria-expanded','false');$('gear').focus();refreshFullscreen();
+  }
+  function restart() { elapsedMs=0; lastFrame=performance.now();lastCueIndex=0;pulseAt=-5000; }
+  function togglePlay() { running=!running;lastFrame=performance.now();refresh(); }
+  function showFullscreenHelp() {
+    const apple=/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+    $('fullscreenHelpText').textContent=apple
+      ? 'Abre el enlace en Safari. Pulsa Compartir → Añadir a pantalla de inicio y activa Abrir como app web si aparece. Después abre el reloj desde su icono para usarlo sin las barras de Safari.'
+      : 'Este navegador no permite activar pantalla completa en esta ventana. Abre el enlace en el navegador principal o instala la aplicación desde su menú, si está disponible.';
+    $('fullscreenHelp').hidden=false;refreshFullscreen();$('fullscreenHelpClose').focus();
+  }
+  async function toggleFullscreen() {
+    const root=document.documentElement;
+    try {
+      if(fullElement()) {
+        const exit=document.exitFullscreen || document.webkitExitFullscreen;
+        if(exit) await exit.call(document);
+      } else if(!appDisplay()) {
+        const enter=root.requestFullscreen || root.webkitRequestFullscreen || root.webkitRequestFullScreen;
+        if(!enter) {showFullscreenHelp();return;}
+        // Solicitar dentro del gesto del usuario, antes de cualquier espera.
+        const result=enter.call(root);
+        if(result && typeof result.then==='function') await result;
+      }
+      resize();refreshFullscreen();
+    }catch(_) {showFullscreenHelp();}
+  }
+  $('startFullscreen').addEventListener('click',toggleFullscreen);
+  $('fullscreenHelpClose').addEventListener('click',()=>{
+    $('fullscreenHelp').hidden=true;dismissedFullscreen=true;refreshFullscreen();$('gear').focus();
+  });
+  $('gear').addEventListener('click',openPanel);
+  $('close').addEventListener('click',closePanel);
+  $('veil').addEventListener('click',closePanel);
+  document.querySelectorAll('[data-mode]').forEach(btn=>btn.addEventListener('click',()=>{
+    state.mode=btn.dataset.mode;lastCueIndex=Math.floor(elapsedMs/(state.interval*1000));refresh();
+  }));
+  document.querySelectorAll('[data-shape]').forEach(btn=>btn.addEventListener('click',()=>{state.shape=btn.dataset.shape;refresh();}));
+  document.querySelectorAll('[data-palette]').forEach(btn=>btn.addEventListener('click',()=>{
+    state.palette=btn.dataset.palette;state.colors=[...palettes[state.palette]];refresh();
+  }));
+  document.querySelectorAll('[data-color]').forEach(el=>el.addEventListener('input',()=>{
+    state.palette='custom';state.colors[Number(el.dataset.color)]=el.value;refresh();
+  }));
+  document.querySelectorAll('[data-shaft]').forEach(btn=>btn.addEventListener('click',()=>{state.shaft=btn.dataset.shaft;refresh();}));
+  document.querySelectorAll('[data-tip]').forEach(btn=>btn.addEventListener('click',()=>{state.tip=btn.dataset.tip;refresh();}));
+  for(const k of ['handLength','handWidth','tipSize','hourLength','hourWidth','hourTipSize','minuteLength','minuteWidth','minuteTipSize']) $(k).addEventListener('input',e=>{state[k]=Number(e.target.value);refresh();});
+  for(const k of ['hourColor','minuteColor','timeColor']) $(k).addEventListener('input',e=>{state[k]=e.target.value;refresh();});
+  for(const k of ['hourShaft','hourTip','minuteShaft','minuteTip']) $(k).addEventListener('change',e=>{state[k]=e.target.value;refresh();});
+  $('theme').addEventListener('change',e=>{state.theme=e.target.value;refresh();});
+  $('marks').addEventListener('change',e=>{state.marks=e.target.value;refresh();});
+  $('interval').addEventListener('change',e=>{state.interval=Number(e.target.value);lastCueIndex=Math.floor(elapsedMs/(state.interval*1000));refresh();});
+  for(const id of ['numbers','training','flash','sound','bigRemaining','showHourHand','showMinuteHand','showDigitalTime']){
+    $(id).addEventListener('change',e=>{
+      state[id]=e.target.checked;
+      if(id==='sound'&&state.sound)unlockAudio();
+      if(id==='training')lastCueIndex=Math.floor(elapsedMs/(state.interval*1000));
+      refresh();
+    });
+  }
+  $('play').addEventListener('click',togglePlay);
+  $('restart').addEventListener('click',()=>{restart();refresh();});
+  $('fullscreen').addEventListener('click',toggleFullscreen);
+  const onFullscreenChange=()=>{resize();refresh();};
+  document.addEventListener('fullscreenchange',onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange',onFullscreenChange);
+  document.addEventListener('webkitfullscreenerror',()=>{if(!fullElement())showFullscreenHelp();});
+  for(const mode of ['standalone','fullscreen']) {
+    const mq=window.matchMedia('(display-mode: '+mode+')');
+    if(mq.addEventListener) mq.addEventListener('change',onFullscreenChange);
+    else if(mq.addListener) mq.addListener(onFullscreenChange);
+  }
+
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&!$('fullscreenHelp').hidden){$('fullscreenHelpClose').click();return;}
+    if(event.key==='Escape'&&!$('panel').hidden){closePanel();return;}
+    if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)) return;
+    if(event.code==='Space') {event.preventDefault();togglePlay();}
+    else if(event.key.toLowerCase()==='r'&&!event.ctrlKey&&!event.metaKey){restart();refresh();}
+    else if(event.key.toLowerCase()==='f'&&!event.ctrlKey&&!event.metaKey){toggleFullscreen();}
+    else if(event.key.toLowerCase()==='c'){ $('panel').hidden?openPanel():closePanel(); }
+  });
+  resize();refresh();requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
